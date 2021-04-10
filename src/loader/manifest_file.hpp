@@ -49,7 +49,6 @@ class ManifestFile {
     ManifestFileType Type() const { return _type; }
     const std::string &Filename() const { return _filename; }
     const std::string &LibraryPath() const { return _library_path; }
-    void GetInstanceExtensionProperties(std::vector<XrExtensionProperties> &props);
     const std::string &GetFunctionName(const std::string &func_name) const;
 
    protected:
@@ -61,7 +60,6 @@ class ManifestFile {
     std::string _filename;
     ManifestFileType _type;
     std::string _library_path;
-    std::vector<ExtensionListing> _instance_extensions;
     std::unordered_map<std::string, std::string> _functions_renamed;
 };
 
@@ -86,6 +84,7 @@ class ApiLayerManifestFile : public ManifestFile {
 
     const std::string &LayerName() const { return _layer_name; }
     void PopulateApiLayerProperties(XrApiLayerProperties &props) const;
+    void GetInstanceExtensionProperties(std::vector<XrExtensionProperties> &props);
 
    private:
     ApiLayerManifestFile(ManifestFileType type, const std::string &filename, const std::string &layer_name,
@@ -98,4 +97,5 @@ class ApiLayerManifestFile : public ManifestFile {
     std::string _layer_name;
     std::string _description;
     uint32_t _implementation_version;
+    std::vector<ExtensionListing> _instance_extensions;
 };

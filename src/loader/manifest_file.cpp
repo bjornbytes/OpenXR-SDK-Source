@@ -435,30 +435,6 @@ bool ManifestFile::IsValidJson(const Json::Value &root_node, JsonVersion &versio
     return true;
 }
 
-static void GetExtensionProperties(const std::vector<ExtensionListing> &extensions, std::vector<XrExtensionProperties> &props) {
-    for (const auto &ext : extensions) {
-        auto it =
-            std::find_if(props.begin(), props.end(), [&](XrExtensionProperties &prop) { return prop.extensionName == ext.name; });
-        if (it != props.end()) {
-            it->extensionVersion = std::max(it->extensionVersion, ext.extension_version);
-        } else {
-            XrExtensionProperties prop = {};
-            prop.type = XR_TYPE_EXTENSION_PROPERTIES;
-            prop.next = nullptr;
-            strncpy(prop.extensionName, ext.name.c_str(), XR_MAX_EXTENSION_NAME_SIZE - 1);
-            prop.extensionName[XR_MAX_EXTENSION_NAME_SIZE - 1] = '\0';
-            prop.extensionVersion = ext.extension_version;
-            props.push_back(prop);
-        }
-    }
-}
-
-// Return any instance extensions found in the manifest files in the proper form for
-// OpenXR (XrExtensionProperties).
-void ManifestFile::GetInstanceExtensionProperties(std::vector<XrExtensionProperties> &props) {
-    GetExtensionProperties(_instance_extensions, props);
-}
-
 const std::string &ManifestFile::GetFunctionName(const std::string &func_name) const {
     if (!_functions_renamed.empty()) {
         auto found = _functions_renamed.find(func_name);
@@ -492,12 +468,6 @@ static void ParseExtension(Json::Value const &ext, std::vector<ExtensionListing>
 }
 
 void ManifestFile::ParseCommon(Json::Value const &root_node) {
-    const Json::Value &inst_exts = root_node["instance_extensions"];
-    if (!inst_exts.isNull() && inst_exts.isArray()) {
-        for (const auto &ext : inst_exts) {
-            ParseExtension(ext, _instance_extensions);
-        }
-    }
     const Json::Value &funcs_renamed = root_node["functions"];
     if (!funcs_renamed.isNull() && !funcs_renamed.empty()) {
         for (Json::ValueConstIterator func_it = funcs_renamed.begin(); func_it != funcs_renamed.end(); ++func_it) {
@@ -587,7 +557,6 @@ void RuntimeManifestFile::CreateIfValid(std::string const &filename,
     // Add this runtime manifest file
     manifest_files.emplace_back(new RuntimeManifestFile(filename, lib_path));
 
-    // Add any extensions to it after the fact.
     // Handle any renamed functions
     manifest_files.back()->ParseCommon(runtime_root_node);
 }
@@ -772,6 +741,14 @@ void ApiLayerManifestFile::CreateIfValid(ManifestFileType type, const std::strin
         new ApiLayerManifestFile(type, filename, layer_name, description, api_version, implementation_version, library_path));
 
     // Add any extensions to it after the fact.
+    const Json::Value &inst_exts = layer_root_node["instance_extensions"];
+    if (!inst_exts.isNull() && inst_exts.isArray()) {
+        for (const auto &ext : inst_exts) {
+            ParseExtension(ext, manifest_files.back()->_instance_extensions);
+        }
+    }
+
+    // Handle any renamed functions
     manifest_files.back()->ParseCommon(layer_root_node);
 }
 
@@ -843,4 +820,28 @@ XrResult ApiLayerManifestFile::FindManifestFiles(ManifestFileType type,
     }
 
     return XR_SUCCESS;
+}
+
+static void GetExtensionProperties(const std::vector<ExtensionListing> &extensions, std::vector<XrExtensionProperties> &props) {
+    for (const auto &ext : extensions) {
+        auto it =
+            std::find_if(props.begin(), props.end(), [&](XrExtensionProperties &prop) { return prop.extensionName == ext.name; });
+        if (it != props.end()) {
+            it->extensionVersion = std::max(it->extensionVersion, ext.extension_version);
+        } else {
+            XrExtensionProperties prop = {};
+            prop.type = XR_TYPE_EXTENSION_PROPERTIES;
+            prop.next = nullptr;
+            strncpy(prop.extensionName, ext.name.c_str(), XR_MAX_EXTENSION_NAME_SIZE - 1);
+            prop.extensionName[XR_MAX_EXTENSION_NAME_SIZE - 1] = '\0';
+            prop.extensionVersion = ext.extension_version;
+            props.push_back(prop);
+        }
+    }
+}
+
+// Return any instance extensions found in the manifest files in the proper form for
+// OpenXR (XrExtensionProperties).
+void ApiLayerManifestFile::GetInstanceExtensionProperties(std::vector<XrExtensionProperties> &props) {
+    GetExtensionProperties(_instance_extensions, props);
 }
